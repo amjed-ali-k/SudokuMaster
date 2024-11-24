@@ -1,184 +1,227 @@
-import create from 'zustand';
-import { Store } from '../types';
-import { generateSudoku, validateMove, checkCompletion } from '../utils/sudokuGenerator';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import type { GameState, Settings, Achievement } from '../types';
+import storageManager from '../utils/storage';
+import { generateSudoku } from '../utils/sudokuGenerator';
 
-const initialState: Store = {
-  game: {
-    currentGame: {
-      initial: Array(9).fill(Array(9).fill(0)),
-      current: Array(9).fill(Array(9).fill(0)),
-    },
-    difficulty: 1,
-    timer: 0,
-    mistakes: 0,
-    notes: {},
-    history: [],
-  },
-  settings: {
-    boardTheme: 'classic',
-    vibrationEnabled: true,
-    statistics: {
-      gamesPlayed: 0,
-      perfectGames: 0,
-      averageTime: 0,
-      bestStreak: 0,
-    },
-  },
-  achievements: [],
-};
+interface StoreState {
+  game: GameState;
+  settings: Settings;
+  achievements: Achievement[];
+  isLoading: boolean;
+  startNewGame: (difficulty: number) => void;
+  makeMove: (row: number, col: number, value: number) => void;
+  toggleNote: (row: number, col: number, value: number) => void;
+  updateSettings: (newSettings: Partial<Settings>) => void;
+  unlockAchievement: (achievement: Achievement) => void;
+  loadPersistedState: () => Promise<void>;
+}
 
-const useStore = create<Store>((set, get) => ({
-  ...initialState,
-
-  // Game Actions
-  updateCell: (row: number, col: number, value: number) => {
-    set((state) => {
-      const newCurrent = [...state.game.currentGame.current];
-      newCurrent[row][col] = value;
-      return {
-        game: {
-          ...state.game,
-          currentGame: {
-            ...state.game.currentGame,
-            current: newCurrent,
-          },
-        },
-      };
-    });
-  },
-
-  addMistake: () => {
-    set((state) => ({
+const useStore = create<StoreState>()(
+  persist(
+    (set, get) => ({
       game: {
-        ...state.game,
-        mistakes: state.game.mistakes + 1,
-      },
-    }));
-  },
-
-  toggleNote: (row: number, col: number, value: number) => {
-    set((state) => {
-      const key = `${row}-${col}`;
-      const currentNotes = state.game.notes[key] || [];
-      const newNotes = currentNotes.includes(value)
-        ? currentNotes.filter((n) => n !== value)
-        : [...currentNotes, value];
-
-      return {
-        game: {
-          ...state.game,
-          notes: {
-            ...state.game.notes,
-            [key]: newNotes,
-          },
-        },
-      };
-    });
-  },
-
-  saveGame: () => {
-    set((state) => {
-      const newHistory = [
-        ...state.game.history,
-        {
-          id: Date.now().toString(),
-          difficulty: state.game.difficulty,
-          duration: state.game.timer,
-          mistakes: state.game.mistakes,
-          perfect: state.game.mistakes === 0,
-          completedAt: new Date().toISOString(),
-        },
-      ];
-
-      // Update statistics
-      const totalTime = state.settings.statistics.averageTime * state.settings.statistics.gamesPlayed;
-      const newAverage = Math.round((totalTime + state.game.timer) / (state.settings.statistics.gamesPlayed + 1));
-
-      return {
-        game: {
-          ...state.game,
-          history: newHistory,
-        },
-        settings: {
-          ...state.settings,
-          statistics: {
-            ...state.settings.statistics,
-            gamesPlayed: state.settings.statistics.gamesPlayed + 1,
-            perfectGames: state.game.mistakes === 0
-              ? state.settings.statistics.perfectGames + 1
-              : state.settings.statistics.perfectGames,
-            averageTime: newAverage,
-          },
-        },
-      };
-    });
-  },
-
-  updateTimer: () => {
-    set((state) => ({
-      game: {
-        ...state.game,
-        timer: state.game.timer + 1,
-      },
-    }));
-  },
-
-  startNewGame: (difficulty: number) => {
-    const newGame = generateSudoku(difficulty);
-    set((state) => ({
-      game: {
-        ...state.game,
-        currentGame: newGame,
-        difficulty,
+        board: Array(9).fill(Array(9).fill(0)),
+        initialBoard: Array(9).fill(Array(9).fill(0)),
+        notes: Array(9).fill(Array(9).fill(new Set<number>())),
+        difficulty: 1,
         timer: 0,
         mistakes: 0,
-        notes: {},
+        history: [],
+        isComplete: false,
+        isPaused: false,
       },
-    }));
-  },
-
-  // Settings Actions
-  updateSettings: (newSettings) => {
-    set((state) => ({
       settings: {
-        ...state.settings,
-        ...newSettings,
-      },
-    }));
-  },
-
-  updateStatistics: (stats) => {
-    set((state) => ({
-      settings: {
-        ...state.settings,
+        boardTheme: 'classic',
+        soundEnabled: true,
+        hapticEnabled: true,
+        autoNotesEnabled: true,
+        highlightMatchingNumbers: true,
+        showMistakes: true,
         statistics: {
-          ...state.settings.statistics,
-          ...stats,
+          gamesPlayed: 0,
+          perfectGames: 0,
+          bestStreak: 0,
+          currentStreak: 0,
+          averageTime: 0,
+          totalPlayTime: 0,
         },
       },
-    }));
-  },
+      achievements: [],
+      isLoading: true,
 
-  // Achievement Actions
-  unlockAchievement: (id: string) => {
-    set((state) => ({
-      achievements: state.achievements.map((achievement) =>
-        achievement.id === id
-          ? { ...achievement, unlocked: true, progress: 100 }
-          : achievement
-      ),
-    }));
-  },
+      startNewGame: (difficulty) => {
+        const { board, solution } = generateSudoku(difficulty);
+        const newGame: GameState = {
+          board,
+          initialBoard: [...board],
+          solution,
+          notes: Array(9).fill(Array(9).fill(new Set<number>())),
+          difficulty,
+          timer: 0,
+          mistakes: 0,
+          history: get().game.history,
+          isComplete: false,
+          isPaused: false,
+        };
+        set({ game: newGame });
+        storageManager.saveGameState(newGame);
+      },
 
-  updateAchievementProgress: (id: string, progress: number) => {
-    set((state) => ({
-      achievements: state.achievements.map((achievement) =>
-        achievement.id === id
-          ? { ...achievement, progress }
-          : achievement
-      ),
-    }));
-  },
-}));
+      makeMove: (row, col, value) => {
+        const { game, settings } = get();
+        if (game.initialBoard[row][col] !== 0 || game.isComplete) return;
+
+        const newBoard = game.board.map((r) => [...r]);
+        newBoard[row][col] = value;
+
+        const isCorrect = value === game.solution[row][col];
+        const newMistakes = isCorrect ? game.mistakes : game.mistakes + 1;
+        const isComplete = newBoard.every((row, i) =>
+          row.every((cell, j) => cell === game.solution[i][j])
+        );
+
+        if (isComplete) {
+          const gameHistory = {
+            id: Date.now().toString(),
+            difficulty: game.difficulty,
+            duration: game.timer,
+            mistakes: newMistakes,
+            perfect: newMistakes === 0,
+            completedAt: new Date().toISOString(),
+            boardTheme: settings.boardTheme,
+            initialBoard: game.initialBoard,
+            finalBoard: newBoard,
+          };
+
+          const newHistory = [gameHistory, ...game.history];
+          const newStats = {
+            ...settings.statistics,
+            gamesPlayed: settings.statistics.gamesPlayed + 1,
+            perfectGames: gameHistory.perfect
+              ? settings.statistics.perfectGames + 1
+              : settings.statistics.perfectGames,
+            currentStreak: gameHistory.perfect
+              ? settings.statistics.currentStreak + 1
+              : 0,
+            bestStreak: Math.max(
+              settings.statistics.bestStreak,
+              gameHistory.perfect ? settings.statistics.currentStreak + 1 : 0
+            ),
+            totalPlayTime: settings.statistics.totalPlayTime + game.timer,
+            averageTime:
+              Math.round(
+                (settings.statistics.totalPlayTime + game.timer) /
+                  (settings.statistics.gamesPlayed + 1)
+              ),
+          };
+
+          set({
+            game: {
+              ...game,
+              board: newBoard,
+              mistakes: newMistakes,
+              isComplete: true,
+              history: newHistory,
+            },
+            settings: {
+              ...settings,
+              statistics: newStats,
+            },
+          });
+
+          storageManager.addGameToHistory(gameHistory);
+          storageManager.saveSettings({ statistics: newStats });
+        } else {
+          set({
+            game: {
+              ...game,
+              board: newBoard,
+              mistakes: newMistakes,
+            },
+          });
+          storageManager.saveGameState({
+            board: newBoard,
+            mistakes: newMistakes,
+          });
+        }
+      },
+
+      toggleNote: (row, col, value) => {
+        const { game } = get();
+        if (game.initialBoard[row][col] !== 0 || game.isComplete) return;
+
+        const newNotes = game.notes.map((r) => r.map((set) => new Set(set)));
+        const currentNotes = newNotes[row][col];
+
+        if (currentNotes.has(value)) {
+          currentNotes.delete(value);
+        } else {
+          currentNotes.add(value);
+        }
+
+        set({
+          game: {
+            ...game,
+            notes: newNotes,
+          },
+        });
+        storageManager.saveGameState({ notes: newNotes });
+      },
+
+      updateSettings: (newSettings) => {
+        const { settings } = get();
+        const updatedSettings = {
+          ...settings,
+          ...newSettings,
+        };
+        set({ settings: updatedSettings });
+        storageManager.saveSettings(newSettings);
+      },
+
+      unlockAchievement: (achievement) => {
+        const { achievements } = get();
+        if (!achievements.some((a) => a.id === achievement.id)) {
+          const newAchievements = [...achievements, achievement];
+          set({ achievements: newAchievements });
+          storageManager.unlockAchievement(achievement);
+        }
+      },
+
+      loadPersistedState: async () => {
+        const [gameState, settings, achievements] = await Promise.all([
+          storageManager.getGameState(),
+          storageManager.getSettings(),
+          storageManager.getAchievements(),
+        ]);
+
+        if (gameState || settings || achievements) {
+          set({
+            game: gameState || get().game,
+            settings: settings || get().settings,
+            achievements: achievements || [],
+            isLoading: false,
+          });
+        }
+      },
+    }),
+    {
+      name: 'sudoku-master-storage',
+      storage: createJSONStorage(() => ({
+        getItem: async (name) => {
+          const value = await storageManager.getGameState();
+          return value ? JSON.stringify(value) : null;
+        },
+        setItem: async (name, value) => {
+          const parsedValue = JSON.parse(value);
+          await storageManager.saveGameState(parsedValue);
+        },
+        removeItem: async (name) => {
+          await storageManager.clearAllData();
+        },
+      })),
+    }
+  )
+);
 
 export default useStore;
