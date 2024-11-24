@@ -6,6 +6,15 @@ interface ThemeColors {
   error: string;
   success: string;
   note: string;
+  selectedBackground: string;
+  initialNumber: string;
+  userNumber: string;
+  noteText: string;
+}
+
+interface ThemeBorders {
+  cell: number;
+  box: number;
 }
 
 export interface BoardTheme {
@@ -13,6 +22,7 @@ export interface BoardTheme {
   name: string;
   description: string;
   colors: ThemeColors;
+  borderWidths: ThemeBorders;
 }
 
 export const boardThemes: Record<string, BoardTheme> = {
@@ -28,6 +38,14 @@ export const boardThemes: Record<string, BoardTheme> = {
       error: '#f44336',
       success: '#4caf50',
       note: '#757575',
+      selectedBackground: '#e3f2fd',
+      initialNumber: '#000000',
+      userNumber: '#2196f3',
+      noteText: '#757575',
+    },
+    borderWidths: {
+      cell: 1,
+      box: 2,
     },
   },
   dark: {
@@ -42,6 +60,14 @@ export const boardThemes: Record<string, BoardTheme> = {
       error: '#cf6679',
       success: '#81c784',
       note: '#b0bec5',
+      selectedBackground: '#1e1e1e',
+      initialNumber: '#ffffff',
+      userNumber: '#64b5f6',
+      noteText: '#b0bec5',
+    },
+    borderWidths: {
+      cell: 1,
+      box: 2,
     },
   },
   sepia: {
@@ -50,12 +76,20 @@ export const boardThemes: Record<string, BoardTheme> = {
     description: 'Warm and comfortable',
     colors: {
       background: '#f4ecd8',
-      grid: '#78664c',
-      text: '#5c4d3c',
-      highlight: '#e8dcc8',
-      error: '#c94d4d',
-      success: '#4a7c59',
-      note: '#8b7355',
+      grid: '#5d4037',
+      text: '#5d4037',
+      highlight: '#efe5cf',
+      error: '#c62828',
+      success: '#2e7d32',
+      note: '#795548',
+      selectedBackground: '#efe5cf',
+      initialNumber: '#5d4037',
+      userNumber: '#795548',
+      noteText: '#795548',
+    },
+    borderWidths: {
+      cell: 1,
+      box: 2,
     },
   },
   ocean: {
@@ -70,6 +104,14 @@ export const boardThemes: Record<string, BoardTheme> = {
       error: '#ef5350',
       success: '#66bb6a',
       note: '#42a5f5',
+      selectedBackground: '#bbdefb',
+      initialNumber: '#1565c0',
+      userNumber: '#42a5f5',
+      noteText: '#42a5f5',
+    },
+    borderWidths: {
+      cell: 1,
+      box: 2,
     },
   },
   forest: {
@@ -84,6 +126,14 @@ export const boardThemes: Record<string, BoardTheme> = {
       error: '#e57373',
       success: '#81c784',
       note: '#66bb6a',
+      selectedBackground: '#c8e6c9',
+      initialNumber: '#2e7d32',
+      userNumber: '#66bb6a',
+      noteText: '#66bb6a',
+    },
+    borderWidths: {
+      cell: 1,
+      box: 2,
     },
   },
   sunset: {
@@ -98,6 +148,14 @@ export const boardThemes: Record<string, BoardTheme> = {
       error: '#ef5350',
       success: '#66bb6a',
       note: '#ffb74d',
+      selectedBackground: '#ffe0b2',
+      initialNumber: '#f57c00',
+      userNumber: '#ffb74d',
+      noteText: '#ffb74d',
+    },
+    borderWidths: {
+      cell: 1,
+      box: 2,
     },
   },
   monochrome: {
@@ -112,6 +170,14 @@ export const boardThemes: Record<string, BoardTheme> = {
       error: '#757575',
       success: '#424242',
       note: '#9e9e9e',
+      selectedBackground: '#eeeeee',
+      initialNumber: '#212121',
+      userNumber: '#9e9e9e',
+      noteText: '#9e9e9e',
+    },
+    borderWidths: {
+      cell: 1,
+      box: 2,
     },
   },
   neon: {
@@ -126,6 +192,14 @@ export const boardThemes: Record<string, BoardTheme> = {
       error: '#ff0000',
       success: '#00ff00',
       note: '#00ffff',
+      selectedBackground: '#1a1a1a',
+      initialNumber: '#00ff00',
+      userNumber: '#00ffff',
+      noteText: '#00ffff',
+    },
+    borderWidths: {
+      cell: 1,
+      box: 2,
     },
   },
 };
