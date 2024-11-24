@@ -89,7 +89,7 @@ class StorageManager {
     }
   }
 
-  async saveSettings(settings: Partial<StorageData>): Promise<void> {
+  async saveSettings(settings: Partial<Settings>): Promise<void> {
     try {
       const currentSettings = await this.getSettings();
       const newSettings = { ...currentSettings, ...settings };
@@ -102,7 +102,7 @@ class StorageManager {
     }
   }
 
-  async getSettings(): Promise<Partial<StorageData> | null> {
+  async getSettings(): Promise<Settings | null> {
     try {
       const settings = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
       return settings ? JSON.parse(settings) : null;
@@ -154,25 +154,101 @@ class StorageManager {
     }
   }
 
-  async getAchievements(): Promise<Achievement[]> {
+  async getAchievements(): Promise<Achievement[] | null> {
     try {
       const achievements = await AsyncStorage.getItem(STORAGE_KEYS.ACHIEVEMENTS);
-      return achievements ? JSON.parse(achievements) : [];
+      return achievements ? JSON.parse(achievements) : null;
     } catch (error) {
       console.error('Error getting achievements:', error);
-      return [];
+      return null;
     }
   }
 
   async unlockAchievement(achievement: Achievement): Promise<void> {
     try {
       const achievements = await this.getAchievements();
-      if (!achievements.some((a) => a.id === achievement.id)) {
-        achievements.push(achievement);
+      if (!achievements?.some((a) => a.id === achievement.id)) {
+        achievements?.push(achievement);
+        if(achievements)
         await this.saveAchievements(achievements);
       }
     } catch (error) {
       console.error('Error unlocking achievement:', error);
+    }
+  }
+
+  async saveProfile(profile: Profile): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.PROFILE,
+        JSON.stringify(profile)
+      );
+    } catch (error) {
+      console.error('Error saving profile:', error);
+    }
+  }
+
+  async getProfile(): Promise<Profile | null> {
+    try {
+      const profile = await AsyncStorage.getItem(STORAGE_KEYS.PROFILE);
+      return profile ? JSON.parse(profile) : null;
+    } catch (error) {
+      console.error('Error getting profile:', error);
+      return null;
+    }
+  }
+
+  async saveTheme(theme: ThemeType): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.THEME,
+        JSON.stringify(theme)
+      );
+    } catch (error) {
+      console.error('Error saving theme:', error);
+    }
+  }
+
+  async getTheme(): Promise<ThemeType | null> {
+    try {
+      const theme = await AsyncStorage.getItem(STORAGE_KEYS.THEME);
+      return theme ? JSON.parse(theme) : null;
+    } catch (error) {
+      console.error('Error getting theme:', error);
+      return null;
+    }
+  }
+
+  async saveThemes(themes: Theme[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.THEMES,
+        JSON.stringify(themes)
+      );
+    } catch (error) {
+      console.error('Error saving themes:', error);
+    }
+  }
+
+  async getThemes(): Promise<Theme[] | null> {
+    try {
+      const themes = await AsyncStorage.getItem(STORAGE_KEYS.THEMES);
+      return themes ? JSON.parse(themes) : null;
+    } catch (error) {
+      console.error('Error getting themes:', error);
+      return null;
+    }
+  }
+
+  async getSelectedTheme(): Promise<Theme | null> {
+    try {
+      const themes = await this.getThemes();
+      const theme = await this.getTheme();
+      if (!themes || !theme) return null;
+      return themes.find(t => t.id === theme) || null;
+    } catch (error) {
+      console.error('Error getting selected theme:', error);
+      return null;
     }
   }
 

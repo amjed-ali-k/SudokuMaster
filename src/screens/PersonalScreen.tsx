@@ -78,21 +78,25 @@ const StatisticsCard: React.FC<StatisticsCardProps> = ({ title, value }) => (
 
 const PersonalScreen: React.FC<PersonalScreenProps> = () => {
   const {
+    settings,
     theme,
-    soundEnabled,
-    vibrationEnabled,
-    highlightSameNumbers,
-    showMistakes,
-    autoNotesEnabled,
     profile,
     setTheme,
+    updateProfile,
     toggleSound,
-    toggleVibration,
-    toggleHighlightSameNumbers,
+    toggleHaptic,
+    toggleHighlightMatching,
     toggleShowMistakes,
     toggleAutoNotes,
-    updateProfile,
   } = useStore();
+
+  const {
+    soundEnabled,
+    hapticEnabled,
+    highlightMatchingNumbers,
+    showMistakes,
+    autoNotesEnabled,
+  } = settings;
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [tempUsername, setTempUsername] = useState(profile.username);
@@ -182,14 +186,14 @@ const PersonalScreen: React.FC<PersonalScreenProps> = () => {
               onValueChange={toggleSound}
             />
             <SettingItem
-              title="Vibration"
-              value={vibrationEnabled}
-              onValueChange={toggleVibration}
+              title="Haptic"
+              value={hapticEnabled}
+              onValueChange={toggleHaptic}
             />
             <SettingItem
-              title="Highlight Same Numbers"
-              value={highlightSameNumbers}
-              onValueChange={toggleHighlightSameNumbers}
+              title="Highlight Matching Numbers"
+              value={highlightMatchingNumbers}
+              onValueChange={toggleHighlightMatching}
             />
             <SettingItem
               title="Show Mistakes"

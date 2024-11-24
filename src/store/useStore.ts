@@ -37,8 +37,13 @@ interface StoreState {
   
   // Settings Actions
   updateSettings: (newSettings: Partial<Settings>) => void;
-  setTheme: (theme: ThemeType) => void;
+  setTheme: (newTheme: ThemeType) => void;
   selectTheme: (themeId: string) => void;
+  toggleSound: () => void;
+  toggleHaptic: () => void;
+  toggleHighlightMatching: () => void;
+  toggleShowMistakes: () => void;
+  toggleAutoNotes: () => void;
   
   // Profile & Achievement Actions
   updateProfile: (updates: Partial<Profile>) => void;
@@ -151,25 +156,28 @@ const useStore = create<StoreState>()(
           const newStats = {
             ...settings.statistics,
             gamesPlayed: settings.statistics.gamesPlayed + 1,
-            perfectGames: gameHistory.perfect
-              ? settings.statistics.perfectGames + 1
+            perfectGames: game.mistakes === 0 
+              ? settings.statistics.perfectGames + 1 
               : settings.statistics.perfectGames,
-            currentStreak: gameHistory.perfect
-              ? settings.statistics.currentStreak + 1
+            bestStreak: game.mistakes === 0 
+              ? settings.statistics.bestStreak + 1 
               : 0,
-            bestStreak: Math.max(
-              settings.statistics.bestStreak,
-              gameHistory.perfect ? settings.statistics.currentStreak + 1 : 0
-            ),
+            currentStreak: game.mistakes === 0 
+              ? settings.statistics.currentStreak + 1 
+              : 0,
             totalPlayTime: settings.statistics.totalPlayTime + game.timer,
-            averageTime:
-              Math.round(
-                (settings.statistics.totalPlayTime + game.timer) /
-                  (settings.statistics.gamesPlayed + 1)
-              ),
+            averageTime: Math.floor(
+              (settings.statistics.totalPlayTime + game.timer) / 
+              (settings.statistics.gamesPlayed + 1)
+            ),
           };
 
-          set({
+          storageManager.saveSettings({
+            ...settings,
+            statistics: newStats,
+          });
+
+          set({ 
             game: {
               ...game,
               board: newBoard,
@@ -180,16 +188,9 @@ const useStore = create<StoreState>()(
             settings: {
               ...settings,
               statistics: newStats,
-            },
-          });
-
-          storageManager.addGameToHistory(gameHistory);
-          storageManager.saveSettings({ 
-            settings: {
-              ...settings,
-              statistics: newStats,
             }
           });
+          storageManager.addGameToHistory(gameHistory);
         } else {
           set({
             game: {
@@ -241,39 +242,68 @@ const useStore = create<StoreState>()(
       },
 
       // Settings Actions
-      updateSettings: (newSettings) => {
-        const { settings } = get();
-        const updatedSettings = {
-          ...settings,
-          ...newSettings,
-        };
+      updateSettings: (newSettings: Partial<Settings>) => {
+        const currentSettings = get().settings;
+        const updatedSettings = { ...currentSettings, ...newSettings };
+        storageManager.saveSettings(updatedSettings);
         set({ settings: updatedSettings });
-        storageManager.saveSettings({ settings: updatedSettings });
       },
 
-      setTheme: (theme) => {
-        set({ theme });
-        storageManager.saveSettings({ theme });
+      setTheme: (newTheme: ThemeType) => {
+        storageManager.saveTheme(newTheme);
+        set({ theme: newTheme });
       },
 
-      selectTheme: (themeId) => {
-        const { themes } = get();
-        const theme = themes.find((t) => t.id === themeId);
-        if (theme) {
-          set({ selectedTheme: theme });
-          storageManager.saveSettings({ selectedTheme: theme });
+      selectTheme: (themeId: string) => {
+        const themes = get().themes;
+        const selectedTheme = themes.find(t => t.id === themeId);
+        if (selectedTheme) {
+          storageManager.saveThemes(themes);
+          set({ selectedTheme });
         }
       },
 
+      toggleSound: () => {
+        const currentSettings = get().settings;
+        const updatedSettings = { ...currentSettings, soundEnabled: !currentSettings.soundEnabled };
+        storageManager.saveSettings(updatedSettings);
+        set({ settings: updatedSettings });
+      },
+
+      toggleHaptic: () => {
+        const currentSettings = get().settings;
+        const updatedSettings = { ...currentSettings, hapticEnabled: !currentSettings.hapticEnabled };
+        storageManager.saveSettings(updatedSettings);
+        set({ settings: updatedSettings });
+      },
+
+      toggleHighlightMatching: () => {
+        const currentSettings = get().settings;
+        const updatedSettings = { ...currentSettings, highlightMatchingNumbers: !currentSettings.highlightMatchingNumbers };
+        storageManager.saveSettings(updatedSettings);
+        set({ settings: updatedSettings });
+      },
+
+      toggleShowMistakes: () => {
+        const currentSettings = get().settings;
+        const updatedSettings = { ...currentSettings, showMistakes: !currentSettings.showMistakes };
+        storageManager.saveSettings(updatedSettings);
+        set({ settings: updatedSettings });
+      },
+
+      toggleAutoNotes: () => {
+        const currentSettings = get().settings;
+        const updatedSettings = { ...currentSettings, autoNotesEnabled: !currentSettings.autoNotesEnabled };
+        storageManager.saveSettings(updatedSettings);
+        set({ settings: updatedSettings });
+      },
+
       // Profile & Achievement Actions
-      updateProfile: (updates) => {
-        const { profile } = get();
-        const updatedProfile = {
-          ...profile,
-          ...updates,
-        };
+      updateProfile: (updates: Partial<Profile>) => {
+        const currentProfile = get().profile;
+        const updatedProfile = { ...currentProfile, ...updates };
+        storageManager.saveProfile(updatedProfile);
         set({ profile: updatedProfile });
-        storageManager.saveSettings({ profile: updatedProfile as Profile });
       },
 
       unlockAchievement: (achievement) => {
@@ -299,20 +329,37 @@ const useStore = create<StoreState>()(
       },
 
       // System Actions
-      loadPersistedState: async () => {
-        const [gameState, settings, achievements] = await Promise.all([
-          storageManager.getGameState(),
-          storageManager.getSettings(),
-          storageManager.getAchievements(),
-        ]);
+      async loadPersistedState() {
+        try {
+          const [
+            gameState,
+            settings,
+            profile,
+            theme,
+            themes,
+            selectedTheme,
+            achievements
+          ] = await Promise.all([
+            storageManager.getGameState(),
+            storageManager.getSettings(),
+            storageManager.getProfile(),
+            storageManager.getTheme(),
+            storageManager.getThemes(),
+            storageManager.getSelectedTheme(),
+            storageManager.getAchievements()
+          ]);
 
-        if (gameState || settings || achievements) {
           set({
             game: gameState || get().game,
-            settings: settings || get().settings,
-            achievements: achievements || [],
-            isLoading: false,
+            settings: settings as Settings || get().settings,
+            profile: profile || get().profile,
+            theme: theme || get().theme,
+            themes: themes || get().themes,
+            selectedTheme: selectedTheme || get().selectedTheme,
+            achievements: achievements || get().achievements,
           });
+        } catch (error) {
+          console.error('Error loading persisted state:', error);
         }
       },
     }),

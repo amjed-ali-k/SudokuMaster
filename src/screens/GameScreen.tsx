@@ -57,8 +57,8 @@ const GameScreen= ({ navigation }: GameScreenProps) => {
   };
 
   const animateCell = (row: number, col: number) => {
-    if (settings.vibrationEnabled) {
-      // Add vibration feedback
+    if (settings.hapticEnabled) {
+      Haptics.selectionAsync();
     }
     cellHighlight.value = withSpring(1, springConfig);
     setTimeout(() => {
