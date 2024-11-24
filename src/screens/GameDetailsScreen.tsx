@@ -25,7 +25,7 @@ const { width } = Dimensions.get('window');
 const GRID_SIZE = width * 0.9;
 const CELL_SIZE = GRID_SIZE / 9;
 
-const GameDetailsScreen: React.FC<GameDetailsScreenProps> = ({ route, navigation }) => {
+const GameDetailsScreen = ({ route, navigation }: GameDetailsScreenProps) => {
   const { game } = useStore();
   const gameHistory = game.history.find((h) => h.id === route.params.gameId);
 

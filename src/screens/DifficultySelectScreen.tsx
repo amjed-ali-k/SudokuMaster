@@ -5,10 +5,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Animated,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import useStore from '../store/useStore';
+import Animated, { 
+  useAnimatedStyle, 
+  useSharedValue,
+  withSpring,
+  WithSpringConfig
+} from 'react-native-reanimated';
+import useStore  from '../store/useStore';
 import { boardThemes } from '../themes/boardThemes';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -44,46 +50,51 @@ const difficultyLevels: DifficultyLevel[] = [
   { level: 10, name: 'Legendary', description: 'The ultimate test' },
 ];
 
-const DifficultyCard: React.FC<DifficultyCardProps> = ({ item, onSelect, selected }) => {
-  const scale = React.useRef(new Animated.Value(1)).current;
+const DifficultyCard = ({ item, onSelect, selected }: DifficultyCardProps) => {
+  const scale = useSharedValue(1);
 
-  React.useEffect(() => {
-    if (selected) {
-      Animated.spring(scale, {
-        toValue: 1.05,
-        friction: 3,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.spring(scale, {
-        toValue: 1,
-        friction: 3,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [selected]);
+  const springConfig: WithSpringConfig = {
+    damping: 10,
+    mass: 1,
+    stiffness: 100,
+  };
+
+  const animateButton = (targetScale: number) => {
+    scale.value = withSpring(targetScale, springConfig);
+  };
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
 
   return (
-    <TouchableOpacity
-      onPress={() => onSelect(item.level)}
-      activeOpacity={0.7}
+    <TouchableWithoutFeedback
+      onPress={() => {
+        animateButton(0.95);
+        setTimeout(() => {
+          animateButton(1);
+          onSelect(item.level);
+        }, 100);
+      }}
     >
       <Animated.View
         style={[
           styles.difficultyCard,
           selected && styles.selectedCard,
-          { transform: [{ scale }] },
+          animatedStyle,
         ]}
       >
         <Text style={styles.levelName}>{item.name}</Text>
         <Text style={styles.levelNumber}>Level {item.level}</Text>
         <Text style={styles.levelDescription}>{item.description}</Text>
       </Animated.View>
-    </TouchableOpacity>
+    </TouchableWithoutFeedback>
   );
 };
 
-const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({ navigation }) => {
+const DifficultySelectScreen = ({ navigation }: DifficultySelectScreenProps) => {
   const { startNewGame, settings, updateSettings } = useStore();
   const [selectedDifficulty, setSelectedDifficulty] = useState<number | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<string>(settings.boardTheme);

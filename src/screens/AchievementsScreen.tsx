@@ -1,106 +1,79 @@
-import React, { useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Animated,
-  TouchableOpacity,
-  ListRenderItem,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/types';
-import useStore from '../store/useStore';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableWithoutFeedback, FlatList } from 'react-native';
+import Animated, { 
+  useAnimatedStyle, 
+  useSharedValue,
+  withSpring,
+  withTiming,
+  withSequence,
+  WithSpringConfig,
+  WithTimingConfig
+} from 'react-native-reanimated';
+import  useStore  from '../store/useStore';
+import type { Achievement } from '../types';
 
-type AchievementsScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Achievements'>;
+type AchievementCardProps = {
+  achievement: Achievement;
+  recent?: boolean;
 };
 
-interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  unlocked: boolean;
-  progress?: number;
-  total?: number;
-}
+const AchievementCard = ({ achievement, recent = false }: AchievementCardProps) => {
+  const scale = useSharedValue(recent ? 0.5 : 1);
+  const rotate = useSharedValue(0);
 
-interface AchievementItemProps {
-  item: Achievement;
-  recent: boolean;
-}
+  const springConfig: WithSpringConfig = {
+    damping: 10,
+    mass: 1,
+    stiffness: 100,
+  };
 
-const AchievementItem: React.FC<AchievementItemProps> = ({ item, recent }) => {
-  const scaleAnim = React.useRef(new Animated.Value(recent ? 0.5 : 1)).current;
-  const rotateAnim = React.useRef(new Animated.Value(0)).current;
+  const timingConfig: WithTimingConfig = {
+    duration: 300,
+  };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (recent) {
-      Animated.parallel([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          friction: 3,
-          useNativeDriver: true,
-        }),
-        Animated.sequence([
-          Animated.timing(rotateAnim, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(rotateAnim, {
-            toValue: -1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(rotateAnim, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]).start();
+      scale.value = withSpring(1, springConfig);
+      rotate.value = withSequence(
+        withTiming(10, timingConfig),
+        withTiming(-10, timingConfig),
+        withTiming(0, timingConfig)
+      );
     }
   }, [recent]);
 
-  const rotate = rotateAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ['-15deg', '0deg', '15deg'],
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { scale: scale.value },
+        { rotate: `${rotate.value}deg` }
+      ],
+    };
   });
 
   return (
-    <Animated.View
-      style={[
-        styles.achievementItem,
-        {
-          transform: [{ scale: scaleAnim }, { rotate }],
-          opacity: item.unlocked ? 1 : 0.5,
-        },
-      ]}
-    >
-      <View style={styles.achievementIcon}>
-        <Text style={styles.iconText}>{item.icon}</Text>
+    <Animated.View style={[styles.achievementCard, animatedStyle]}>
+      <View style={styles.iconContainer}>
+        <Text style={styles.icon}>{achievement.icon}</Text>
       </View>
-      <View style={styles.achievementInfo}>
-        <Text style={styles.achievementTitle}>{item.title}</Text>
-        <Text style={styles.achievementDescription}>{item.description}</Text>
-        {item.progress !== undefined && item.total !== undefined && (
-          <View style={styles.progressBar}>
-            <View
+      <View style={styles.textContainer}>
+        <Text style={styles.title}>{achievement.title}</Text>
+        <Text style={styles.description}>{achievement.description}</Text>
+        {achievement.progress !== undefined && achievement.total !== undefined && (
+          <View style={styles.progressContainer}>
+            <View 
               style={[
-                styles.progressFill,
-                { width: `${(item.progress / item.total) * 100}%` },
-              ]}
+                styles.progressBar, 
+                { width: `${(achievement.progress / achievement.total) * 100}%` }
+              ]} 
             />
             <Text style={styles.progressText}>
-              {item.progress}/{item.total}
+              {achievement.progress}/{achievement.total}
             </Text>
           </View>
         )}
       </View>
-      {item.unlocked && (
+      {achievement.unlocked && (
         <View style={styles.unlockedBadge}>
           <Text style={styles.unlockedText}>✓</Text>
         </View>
@@ -109,10 +82,10 @@ const AchievementItem: React.FC<AchievementItemProps> = ({ item, recent }) => {
   );
 };
 
-const AchievementsScreen: React.FC<AchievementsScreenProps> = () => {
+const AchievementsScreen = () => {
   const { achievements, recentUnlocks, clearRecentUnlocks } = useStore();
 
-  useEffect(() => {
+  React.useEffect(() => {
     const timer = setTimeout(() => {
       clearRecentUnlocks();
     }, 3000);
@@ -120,10 +93,10 @@ const AchievementsScreen: React.FC<AchievementsScreenProps> = () => {
     return () => clearTimeout(timer);
   }, [recentUnlocks]);
 
-  const renderItem: ListRenderItem<Achievement> = ({ item }) => (
-    <AchievementItem
-      item={item}
-      recent={recentUnlocks.some((unlock) => unlock.id === item.id)}
+  const renderItem = ({ item }) => (
+    <AchievementCard 
+      achievement={item}
+      recent={recentUnlocks.some(a => a.id === item.id)}
     />
   );
 
@@ -131,10 +104,7 @@ const AchievementsScreen: React.FC<AchievementsScreenProps> = () => {
   const unlockedCount = achievementsArray.filter((a) => a.unlocked).length;
 
   return (
-    <LinearGradient
-      colors={['#4c669f', '#3b5998', '#192f6a']}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Achievements</Text>
         <Text style={styles.headerSubtitle}>
@@ -148,13 +118,14 @@ const AchievementsScreen: React.FC<AchievementsScreenProps> = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
   },
   header: {
     padding: 20,
@@ -163,17 +134,17 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#333',
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#fff',
+    color: '#666',
     opacity: 0.8,
   },
   listContainer: {
     padding: 15,
   },
-  achievementItem: {
+  achievementCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 10,
     padding: 15,
@@ -189,7 +160,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  achievementIcon: {
+  iconContainer: {
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -198,30 +169,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 15,
   },
-  iconText: {
+  icon: {
     fontSize: 24,
   },
-  achievementInfo: {
+  textContainer: {
     flex: 1,
   },
-  achievementTitle: {
+  title: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
-  achievementDescription: {
+  description: {
     fontSize: 14,
     color: '#666',
     marginTop: 5,
   },
-  progressBar: {
+  progressContainer: {
     height: 6,
     backgroundColor: '#f0f0f0',
     borderRadius: 3,
     marginTop: 8,
     overflow: 'hidden',
   },
-  progressFill: {
+  progressBar: {
     height: '100%',
     backgroundColor: '#4CAF50',
     borderRadius: 3,

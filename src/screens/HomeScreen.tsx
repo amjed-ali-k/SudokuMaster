@@ -4,14 +4,18 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Animated,
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import useStore from '../store/useStore';
+import Animated, { 
+  useAnimatedStyle, 
+  useSharedValue,
+  withSpring,
+  WithSpringConfig
+} from 'react-native-reanimated';
 
 type HomeScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -19,39 +23,49 @@ type HomeScreenProps = {
 
 const { width } = Dimensions.get('window');
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
-  const { settings, game } = useStore();
-  const buttonScale = React.useRef(new Animated.Value(1)).current;
+const HomeScreen = ({ navigation }: HomeScreenProps) => {
+  const { settings, game, profile } = useStore();
+  const buttonScale = useSharedValue(1);
+
+  const springConfig: WithSpringConfig = {
+    damping: 10,
+    mass: 1,
+    stiffness: 100,
+  };
 
   const animateButton = (scale: number) => {
-    Animated.spring(buttonScale, {
-      toValue: scale,
-      friction: 3,
-      useNativeDriver: true,
-    }).start();
+    buttonScale.value = withSpring(scale, springConfig);
   };
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: buttonScale.value }],
+    };
+  });
 
   const handleNewGame = () => {
     navigation.navigate('DifficultySelect');
   };
 
-  const handleResumeGame = () => {
-    if (game.isGameActive) {
-      navigation.navigate('Game');
-    }
+  const handleContinueGame = () => {
+    navigation.navigate('Game');
   };
 
   const renderWelcomeMessage = () => {
-    const hour = new Date().getHours();
-    let greeting = 'Good ';
-    if (hour < 12) greeting += 'morning';
-    else if (hour < 18) greeting += 'afternoon';
-    else greeting += 'evening';
-
+    const hasActiveGame = game.board.some(row => row.some(cell => cell !== 0));
+    const username = profile?.username || 'Player';
+    
     return (
-      <Text style={styles.welcomeText}>
-        {greeting}, {settings.username || 'Player'}!
-      </Text>
+      <View style={styles.welcomeContainer}>
+        <Text style={styles.welcomeText}>
+          Welcome back, {username}!
+        </Text>
+        <Text style={styles.subtitleText}>
+          {hasActiveGame 
+            ? "You have an active game. Continue your progress!" 
+            : "Ready for a new challenge?"}
+        </Text>
+      </View>
     );
   };
 
@@ -64,29 +78,33 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {renderWelcomeMessage()}
         
         <Animated.View
-          style={[styles.buttonContainer, { transform: [{ scale: buttonScale }] }]}
+          style={[styles.buttonContainer, animatedStyle]}
         >
           <TouchableOpacity
             style={[styles.button, styles.newGameButton]}
-            onPress={handleNewGame}
             onPressIn={() => animateButton(0.95)}
             onPressOut={() => animateButton(1)}
+            onPress={handleNewGame}
           >
             <Text style={styles.buttonText}>New Game</Text>
           </TouchableOpacity>
 
-          {game.isGameActive && (
+          {game.board.some(row => row.some(cell => cell !== 0)) && (
             <TouchableOpacity
-              style={[styles.button, styles.resumeButton]}
-              onPress={handleResumeGame}
+              style={[styles.button, styles.continueButton]}
+              onPressIn={() => animateButton(0.95)}
+              onPressOut={() => animateButton(1)}
+              onPress={handleContinueGame}
             >
-              <Text style={styles.buttonText}>Resume Game</Text>
+              <Text style={styles.buttonText}>Continue Game</Text>
             </TouchableOpacity>
           )}
 
-          {game.gameHistory.length > 0 && (
+          {game.history.length > 0 && (
             <TouchableOpacity
               style={[styles.button, styles.historyButton]}
+              onPressIn={() => animateButton(0.95)}
+              onPressOut={() => animateButton(1)}
               onPress={() => navigation.navigate('GameHistory')}
             >
               <Text style={styles.buttonText}>Game History</Text>
@@ -108,11 +126,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  welcomeContainer: {
+    marginBottom: 40,
+  },
   welcomeText: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 40,
+    textAlign: 'center',
+  },
+  subtitleText: {
+    fontSize: 18,
+    color: '#fff',
     textAlign: 'center',
   },
   buttonContainer: {
@@ -136,7 +161,7 @@ const styles = StyleSheet.create({
   newGameButton: {
     backgroundColor: '#4CAF50',
   },
-  resumeButton: {
+  continueButton: {
     backgroundColor: '#2196F3',
   },
   historyButton: {

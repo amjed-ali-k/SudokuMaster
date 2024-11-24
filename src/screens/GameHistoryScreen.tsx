@@ -23,7 +23,7 @@ type GameHistoryScreenProps = {
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.9;
 
-const GameHistoryScreen: React.FC<GameHistoryScreenProps> = ({ navigation }) => {
+const GameHistoryScreen = ({ navigation }: GameHistoryScreenProps) => {
   const { game, settings } = useStore();
 
   const renderHistoryItem = ({ item }: { item: GameHistory }) => {

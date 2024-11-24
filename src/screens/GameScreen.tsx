@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Animated,
   Dimensions,
   Alert,
 } from 'react-native';
@@ -16,6 +15,7 @@ import { boardThemes } from '../themes/boardThemes';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
+import { useSharedValue, withSpring, useAnimatedStyle, interpolate } from 'react-native-reanimated';
 
 type GameScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Game'>;
@@ -30,7 +30,7 @@ type CellPosition = {
 const { width } = Dimensions.get('window');
 const CELL_SIZE = Math.floor((width - 40) / 9);
 
-const GameScreen: React.FC<GameScreenProps> = ({ navigation }) => {
+const GameScreen= ({ navigation }: GameScreenProps) => {
   const {
     game,
     settings,
@@ -44,15 +44,43 @@ const GameScreen: React.FC<GameScreenProps> = ({ navigation }) => {
 
   const [selectedCell, setSelectedCell] = useState<CellPosition>(null);
   const [isNotesMode, setIsNotesMode] = useState(false);
-  const boardScale = useRef(new Animated.Value(0.95)).current;
-  const cellHighlight = useRef(new Animated.Value(0)).current;
+  const boardScale = useSharedValue(0.95);
+  const cellHighlight = useSharedValue(0);
+
+  const springConfig: any = {
+    damping: 10,
+    mass: 1,
+    stiffness: 100,
+  };
+
+  const animateBoard = () => {
+    boardScale.value = withSpring(1, springConfig);
+  };
+
+  const animateCell = (row: number, col: number) => {
+    if (settings.vibrationEnabled) {
+      // Add vibration feedback
+    }
+    cellHighlight.value = withSpring(1, springConfig);
+    setTimeout(() => {
+      cellHighlight.value = withSpring(0, springConfig);
+    }, 300);
+  };
+
+  const boardAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: boardScale.value }],
+    };
+  });
+
+  const cellAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(cellHighlight.value, [0, 1], [0, 0.3]),
+    };
+  });
 
   useEffect(() => {
-    Animated.spring(boardScale, {
-      toValue: 1,
-      friction: 5,
-      useNativeDriver: true,
-    }).start();
+    animateBoard();
 
     // Start timer
     const timer = setInterval(() => {
@@ -65,18 +93,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ navigation }) => {
   const handleCellPress = (row: number, col: number) => {
     if (game.currentGame.initial[row][col] === 0) {
       setSelectedCell({ row, col });
-      Animated.sequence([
-        Animated.timing(cellHighlight, {
-          toValue: 1,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(cellHighlight, {
-          toValue: 0,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      animateCell(row, col);
     }
   };
 
@@ -98,9 +115,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ navigation }) => {
       }
     } else {
       addMistake();
-      if (settings.vibrationEnabled) {
-        // Add vibration feedback
-      }
       if (game.mistakes >= 3) {
         Alert.alert(
           'Game Over',
@@ -201,14 +215,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ navigation }) => {
 
   const renderBoard = () => {
     return (
-      <Animated.View
-        style={[
-          styles.board,
-          {
-            transform: [{ scale: boardScale }],
-          },
-        ]}
-      >
+      <View style={boardAnimatedStyle}>
         {Array(9)
           .fill(null)
           .map((_, row) => (
@@ -218,7 +225,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ navigation }) => {
                 .map((_, col) => renderCell(row, col))}
             </View>
           ))}
-      </Animated.View>
+      </View>
     );
   };
 
