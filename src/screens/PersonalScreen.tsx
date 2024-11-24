@@ -9,26 +9,54 @@ import {
   Image,
   TextInput,
   Modal,
+  ImageSourcePropType,
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import {
-  setTheme,
-  toggleSound,
-  toggleVibration,
-  toggleHighlightSameNumbers,
-  toggleShowMistakes,
-  toggleAutoNotes,
-  updateProfile,
-} from '../store/settingsSlice';
+import useStore from '../store/useStore';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
 
-const SettingItem = ({ title, value, onValueChange, type = 'switch' }) => (
+interface PersonalScreenProps {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Personal'>;
+}
+
+interface SettingItemProps {
+  title: string;
+  value: boolean | string;
+  onValueChange: () => void;
+  type?: 'switch' | 'button';
+}
+
+interface StatisticsCardProps {
+  title: string;
+  value: string | number;
+}
+
+interface Statistics {
+  gamesPlayed: number;
+  gamesWon: number;
+  bestTime: number | null;
+  averageTime: number | null;
+}
+
+interface UserProfile {
+  username: string;
+  avatar?: string;
+  statistics: Statistics;
+}
+
+const SettingItem: React.FC<SettingItemProps> = ({ 
+  title, 
+  value, 
+  onValueChange, 
+  type = 'switch' 
+}) => (
   <View style={styles.settingItem}>
     <Text style={styles.settingTitle}>{title}</Text>
     {type === 'switch' ? (
       <Switch
-        value={value}
+        value={value as boolean}
         onValueChange={onValueChange}
         trackColor={{ false: '#767577', true: '#4CAF50' }}
         thumbColor={value ? '#fff' : '#f4f3f4'}
@@ -41,25 +69,40 @@ const SettingItem = ({ title, value, onValueChange, type = 'switch' }) => (
   </View>
 );
 
-const StatisticsCard = ({ title, value }) => (
+const StatisticsCard: React.FC<StatisticsCardProps> = ({ title, value }) => (
   <View style={styles.statCard}>
     <Text style={styles.statValue}>{value}</Text>
     <Text style={styles.statTitle}>{title}</Text>
   </View>
 );
 
-const PersonalScreen = () => {
-  const dispatch = useDispatch();
-  const settings = useSelector((state) => state.settings);
+const PersonalScreen: React.FC<PersonalScreenProps> = () => {
+  const {
+    theme,
+    soundEnabled,
+    vibrationEnabled,
+    highlightSameNumbers,
+    showMistakes,
+    autoNotesEnabled,
+    profile,
+    setTheme,
+    toggleSound,
+    toggleVibration,
+    toggleHighlightSameNumbers,
+    toggleShowMistakes,
+    toggleAutoNotes,
+    updateProfile,
+  } = useStore();
+
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [tempUsername, setTempUsername] = useState(settings.username);
+  const [tempUsername, setTempUsername] = useState(profile.username);
 
   const handleUpdateProfile = () => {
-    dispatch(updateProfile({ username: tempUsername }));
+    updateProfile({ username: tempUsername });
     setIsEditingProfile(false);
   };
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     if (hours > 0) {
@@ -80,8 +123,11 @@ const PersonalScreen = () => {
             style={styles.avatarContainer}
             onPress={() => {/* Handle avatar change */}}
           >
-            {settings.avatar ? (
-              <Image source={{ uri: settings.avatar }} style={styles.avatar} />
+            {profile.avatar ? (
+              <Image 
+                source={{ uri: profile.avatar } as ImageSourcePropType} 
+                style={styles.avatar} 
+              />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Ionicons name="person" size={40} color="#fff" />
@@ -92,7 +138,7 @@ const PersonalScreen = () => {
             </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setIsEditingProfile(true)}>
-            <Text style={styles.username}>{settings.username || 'Player'}</Text>
+            <Text style={styles.username}>{profile.username || 'Player'}</Text>
             <Text style={styles.editProfile}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
@@ -103,19 +149,19 @@ const PersonalScreen = () => {
           <View style={styles.statsGrid}>
             <StatisticsCard
               title="Games Played"
-              value={settings.statistics.gamesPlayed}
+              value={profile.statistics.gamesPlayed}
             />
             <StatisticsCard
               title="Win Rate"
-              value={`${Math.round((settings.statistics.gamesWon / settings.statistics.gamesPlayed) * 100) || 0}%`}
+              value={`${Math.round((profile.statistics.gamesWon / profile.statistics.gamesPlayed) * 100) || 0}%`}
             />
             <StatisticsCard
               title="Best Time"
-              value={settings.statistics.bestTime ? formatTime(settings.statistics.bestTime) : '-'}
+              value={profile.statistics.bestTime ? formatTime(profile.statistics.bestTime) : '-'}
             />
             <StatisticsCard
               title="Avg Time"
-              value={settings.statistics.averageTime ? formatTime(settings.statistics.averageTime) : '-'}
+              value={profile.statistics.averageTime ? formatTime(profile.statistics.averageTime) : '-'}
             />
           </View>
         </View>
@@ -126,36 +172,34 @@ const PersonalScreen = () => {
           <View style={styles.settingsContainer}>
             <SettingItem
               title="Theme"
-              value={settings.theme === 'light' ? 'Light' : 'Dark'}
-              onValueChange={() =>
-                dispatch(setTheme(settings.theme === 'light' ? 'dark' : 'light'))
-              }
+              value={theme === 'light' ? 'Light' : 'Dark'}
+              onValueChange={() => setTheme(theme === 'light' ? 'dark' : 'light')}
               type="button"
             />
             <SettingItem
               title="Sound"
-              value={settings.soundEnabled}
-              onValueChange={() => dispatch(toggleSound())}
+              value={soundEnabled}
+              onValueChange={toggleSound}
             />
             <SettingItem
               title="Vibration"
-              value={settings.vibrationEnabled}
-              onValueChange={() => dispatch(toggleVibration())}
+              value={vibrationEnabled}
+              onValueChange={toggleVibration}
             />
             <SettingItem
               title="Highlight Same Numbers"
-              value={settings.highlightSameNumbers}
-              onValueChange={() => dispatch(toggleHighlightSameNumbers())}
+              value={highlightSameNumbers}
+              onValueChange={toggleHighlightSameNumbers}
             />
             <SettingItem
               title="Show Mistakes"
-              value={settings.showMistakes}
-              onValueChange={() => dispatch(toggleShowMistakes())}
+              value={showMistakes}
+              onValueChange={toggleShowMistakes}
             />
             <SettingItem
               title="Auto Notes"
-              value={settings.autoNotesEnabled}
-              onValueChange={() => dispatch(toggleAutoNotes())}
+              value={autoNotesEnabled}
+              onValueChange={toggleAutoNotes}
             />
           </View>
         </View>

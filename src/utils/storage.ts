@@ -1,12 +1,33 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { GameState, Settings, GameHistory, Achievement } from '../types';
+import type { 
+  GameState, 
+  Settings, 
+  GameHistory, 
+  Achievement, 
+  Profile, 
+  Theme, 
+  ThemeType 
+} from '../types';
 
 const STORAGE_KEYS = {
   GAME_STATE: '@SudokuMaster:gameState',
   SETTINGS: '@SudokuMaster:settings',
   GAME_HISTORY: '@SudokuMaster:gameHistory',
   ACHIEVEMENTS: '@SudokuMaster:achievements',
+  PROFILE: '@SudokuMaster:profile',
+  THEME: '@SudokuMaster:theme',
+  THEMES: '@SudokuMaster:themes',
 } as const;
+
+export type StorageData = {
+  gameState: GameState;
+  settings: Settings;
+  profile: Profile;
+  theme: ThemeType;
+  themes: Theme[];
+  selectedTheme: Theme;
+  achievements: Achievement[];
+};
 
 class StorageManager {
   private static instance: StorageManager;
@@ -18,6 +39,31 @@ class StorageManager {
       StorageManager.instance = new StorageManager();
     }
     return StorageManager.instance;
+  }
+
+  async getData(key: string): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (error) {
+      console.error(`Error getting data for key ${key}:`, error);
+      return null;
+    }
+  }
+
+  async setData(key: string, value: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (error) {
+      console.error(`Error setting data for key ${key}:`, error);
+    }
+  }
+
+  async removeData(key: string): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing data for key ${key}:`, error);
+    }
   }
 
   async saveGameState(gameState: Partial<GameState>): Promise<void> {
@@ -43,7 +89,7 @@ class StorageManager {
     }
   }
 
-  async saveSettings(settings: Partial<Settings>): Promise<void> {
+  async saveSettings(settings: Partial<StorageData>): Promise<void> {
     try {
       const currentSettings = await this.getSettings();
       const newSettings = { ...currentSettings, ...settings };
@@ -56,7 +102,7 @@ class StorageManager {
     }
   }
 
-  async getSettings(): Promise<Settings | null> {
+  async getSettings(): Promise<Partial<StorageData> | null> {
     try {
       const settings = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
       return settings ? JSON.parse(settings) : null;
@@ -132,20 +178,13 @@ class StorageManager {
 
   async clearAllData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([
-        STORAGE_KEYS.GAME_STATE,
-        STORAGE_KEYS.SETTINGS,
-        STORAGE_KEYS.GAME_HISTORY,
-        STORAGE_KEYS.ACHIEVEMENTS,
-      ]);
+      await AsyncStorage.multiRemove(Object.values(STORAGE_KEYS));
     } catch (error) {
       console.error('Error clearing all data:', error);
     }
   }
 
   async migrateData(version: string): Promise<void> {
-    // Implement data migration logic here when needed
-    // This method will be useful for future app updates
     try {
       const currentVersion = await AsyncStorage.getItem('@SudokuMaster:version');
       if (currentVersion !== version) {

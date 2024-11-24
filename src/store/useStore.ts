@@ -1,61 +1,114 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { GameState, Settings, Achievement } from '../types';
+import type { 
+  GameState, 
+  Settings, 
+  Achievement, 
+  Profile, 
+  Theme, 
+  ThemeType, 
+  GameHistory 
+} from '../types';
 import storageManager from '../utils/storage';
 import { generateSudoku } from '../utils/sudokuGenerator';
 
 interface StoreState {
+  // Game State
   game: GameState;
-  settings: Settings;
-  achievements: Achievement[];
   isLoading: boolean;
+  
+  // Settings & Preferences
+  settings: Settings;
+  theme: ThemeType;
+  themes: Theme[];
+  selectedTheme: Theme;
+  
+  // User Data
+  profile: Profile;
+  achievements: Achievement[];
+  recentUnlocks: Achievement[];
+  
+  // Game Actions
   startNewGame: (difficulty: number) => void;
   makeMove: (row: number, col: number, value: number) => void;
   toggleNote: (row: number, col: number, value: number) => void;
+  pauseGame: () => void;
+  resumeGame: () => void;
+  
+  // Settings Actions
   updateSettings: (newSettings: Partial<Settings>) => void;
+  setTheme: (theme: ThemeType) => void;
+  selectTheme: (themeId: string) => void;
+  
+  // Profile & Achievement Actions
+  updateProfile: (updates: Partial<Profile>) => void;
   unlockAchievement: (achievement: Achievement) => void;
+  clearRecentUnlocks: () => void;
+  
+  // System Actions
   loadPersistedState: () => Promise<void>;
 }
+
+const initialGameState: GameState = {
+  board: Array(9).fill(Array(9).fill(0)),
+  initialBoard: Array(9).fill(Array(9).fill(0)),
+  notes: Array(9).fill(Array(9).fill(new Set<number>())),
+  difficulty: 1,
+  timer: 0,
+  mistakes: 0,
+  history: [],
+  isComplete: false,
+  isPaused: false,
+};
+
+const initialSettings: Settings = {
+  boardTheme: 'classic',
+  soundEnabled: true,
+  hapticEnabled: true,
+  autoNotesEnabled: true,
+  highlightMatchingNumbers: true,
+  showMistakes: true,
+  statistics: {
+    gamesPlayed: 0,
+    perfectGames: 0,
+    bestStreak: 0,
+    currentStreak: 0,
+    averageTime: 0,
+    totalPlayTime: 0,
+  },
+};
+
+const initialProfile: Profile = {
+  username: 'Player',
+  statistics: {
+    gamesPlayed: 0,
+    gamesWon: 0,
+    bestTime: null,
+    averageTime: null,
+  },
+};
 
 const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
-      game: {
-        board: Array(9).fill(Array(9).fill(0)),
-        initialBoard: Array(9).fill(Array(9).fill(0)),
-        notes: Array(9).fill(Array(9).fill(new Set<number>())),
-        difficulty: 1,
-        timer: 0,
-        mistakes: 0,
-        history: [],
-        isComplete: false,
-        isPaused: false,
-      },
-      settings: {
-        boardTheme: 'classic',
-        soundEnabled: true,
-        hapticEnabled: true,
-        autoNotesEnabled: true,
-        highlightMatchingNumbers: true,
-        showMistakes: true,
-        statistics: {
-          gamesPlayed: 0,
-          perfectGames: 0,
-          bestStreak: 0,
-          currentStreak: 0,
-          averageTime: 0,
-          totalPlayTime: 0,
-        },
-      },
+      // Initial State
+      game: initialGameState,
+      settings: initialSettings,
+      profile: initialProfile,
+      theme: 'light',
+      themes: [],
+      selectedTheme: {} as Theme,
       achievements: [],
+      recentUnlocks: [],
       isLoading: true,
 
+      // Game Actions
       startNewGame: (difficulty) => {
-        const { board, solution } = generateSudoku(difficulty);
+        const puzzle = generateSudoku(difficulty);
         const newGame: GameState = {
-          board,
-          initialBoard: [...board],
-          solution,
+          board: puzzle.current,
+          initialBoard: puzzle.initial,
+          solution: puzzle.solution,
           notes: Array(9).fill(Array(9).fill(new Set<number>())),
           difficulty,
           timer: 0,
@@ -75,14 +128,14 @@ const useStore = create<StoreState>()(
         const newBoard = game.board.map((r) => [...r]);
         newBoard[row][col] = value;
 
-        const isCorrect = value === game.solution[row][col];
+        const isCorrect = game.solution && value === game.solution[row][col];
         const newMistakes = isCorrect ? game.mistakes : game.mistakes + 1;
-        const isComplete = newBoard.every((row, i) =>
-          row.every((cell, j) => cell === game.solution[i][j])
+        const isComplete = game.solution && newBoard.every((row, i) =>
+          row.every((cell, j) => cell === game.solution![i][j])
         );
 
         if (isComplete) {
-          const gameHistory = {
+          const gameHistory: GameHistory = {
             id: Date.now().toString(),
             difficulty: game.difficulty,
             duration: game.timer,
@@ -131,7 +184,12 @@ const useStore = create<StoreState>()(
           });
 
           storageManager.addGameToHistory(gameHistory);
-          storageManager.saveSettings({ statistics: newStats });
+          storageManager.saveSettings({ 
+            settings: {
+              ...settings,
+              statistics: newStats,
+            }
+          });
         } else {
           set({
             game: {
@@ -141,6 +199,7 @@ const useStore = create<StoreState>()(
             },
           });
           storageManager.saveGameState({
+            ...game,
             board: newBoard,
             mistakes: newMistakes,
           });
@@ -166,9 +225,22 @@ const useStore = create<StoreState>()(
             notes: newNotes,
           },
         });
-        storageManager.saveGameState({ notes: newNotes });
+        storageManager.saveGameState({ ...game, notes: newNotes });
       },
 
+      pauseGame: () => {
+        const { game } = get();
+        set({ game: { ...game, isPaused: true } });
+        storageManager.saveGameState({ ...game, isPaused: true });
+      },
+
+      resumeGame: () => {
+        const { game } = get();
+        set({ game: { ...game, isPaused: false } });
+        storageManager.saveGameState({ ...game, isPaused: false });
+      },
+
+      // Settings Actions
       updateSettings: (newSettings) => {
         const { settings } = get();
         const updatedSettings = {
@@ -176,18 +248,57 @@ const useStore = create<StoreState>()(
           ...newSettings,
         };
         set({ settings: updatedSettings });
-        storageManager.saveSettings(newSettings);
+        storageManager.saveSettings({ settings: updatedSettings });
       },
 
-      unlockAchievement: (achievement) => {
-        const { achievements } = get();
-        if (!achievements.some((a) => a.id === achievement.id)) {
-          const newAchievements = [...achievements, achievement];
-          set({ achievements: newAchievements });
-          storageManager.unlockAchievement(achievement);
+      setTheme: (theme) => {
+        set({ theme });
+        storageManager.saveSettings({ theme });
+      },
+
+      selectTheme: (themeId) => {
+        const { themes } = get();
+        const theme = themes.find((t) => t.id === themeId);
+        if (theme) {
+          set({ selectedTheme: theme });
+          storageManager.saveSettings({ selectedTheme: theme });
         }
       },
 
+      // Profile & Achievement Actions
+      updateProfile: (updates) => {
+        const { profile } = get();
+        const updatedProfile = {
+          ...profile,
+          ...updates,
+        };
+        set({ profile: updatedProfile });
+        storageManager.saveSettings({ profile: updatedProfile as Profile });
+      },
+
+      unlockAchievement: (achievement) => {
+        const { achievements, recentUnlocks } = get();
+        if (!achievements.some((a) => a.id === achievement.id)) {
+          const unlockedAchievement = {
+            ...achievement,
+            unlocked: true,
+            unlockedAt: new Date().toISOString(),
+          };
+          const newAchievements = [...achievements, unlockedAchievement];
+          const newRecentUnlocks = [...recentUnlocks, unlockedAchievement];
+          set({ 
+            achievements: newAchievements,
+            recentUnlocks: newRecentUnlocks,
+          });
+          storageManager.unlockAchievement(unlockedAchievement);
+        }
+      },
+
+      clearRecentUnlocks: () => {
+        set({ recentUnlocks: [] });
+      },
+
+      // System Actions
       loadPersistedState: async () => {
         const [gameState, settings, achievements] = await Promise.all([
           storageManager.getGameState(),
@@ -208,16 +319,15 @@ const useStore = create<StoreState>()(
     {
       name: 'sudoku-master-storage',
       storage: createJSONStorage(() => ({
-        getItem: async (name) => {
-          const value = await storageManager.getGameState();
-          return value ? JSON.stringify(value) : null;
+        getItem: async (name: string) => {
+          const value = await storageManager.getData(name);
+          return value ? JSON.parse(value) : null;
         },
-        setItem: async (name, value) => {
-          const parsedValue = JSON.parse(value);
-          await storageManager.saveGameState(parsedValue);
+        setItem: async (name: string, value: any) => {
+          await storageManager.setData(name, JSON.stringify(value));
         },
-        removeItem: async (name) => {
-          await storageManager.clearAllData();
+        removeItem: async (name: string) => {
+          await storageManager.removeData(name);
         },
       })),
     }

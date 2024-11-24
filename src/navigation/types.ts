@@ -7,4 +7,5 @@ export type RootStackParamList = {
   Achievements: undefined;
   Settings: undefined;
   Personal: undefined;
+  ThemeSelect: undefined;
 };

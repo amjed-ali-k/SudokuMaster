@@ -6,12 +6,33 @@ import {
   FlatList,
   Animated,
   TouchableOpacity,
+  ListRenderItem,
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
 import { LinearGradient } from 'expo-linear-gradient';
-import { clearRecentUnlocks } from '../store/achievementsSlice';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
+import useStore from '../store/useStore';
 
-const AchievementItem = ({ item, recent }) => {
+type AchievementsScreenProps = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Achievements'>;
+};
+
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlocked: boolean;
+  progress?: number;
+  total?: number;
+}
+
+interface AchievementItemProps {
+  item: Achievement;
+  recent: boolean;
+}
+
+const AchievementItem: React.FC<AchievementItemProps> = ({ item, recent }) => {
   const scaleAnim = React.useRef(new Animated.Value(recent ? 0.5 : 1)).current;
   const rotateAnim = React.useRef(new Animated.Value(0)).current;
 
@@ -65,7 +86,7 @@ const AchievementItem = ({ item, recent }) => {
       <View style={styles.achievementInfo}>
         <Text style={styles.achievementTitle}>{item.title}</Text>
         <Text style={styles.achievementDescription}>{item.description}</Text>
-        {item.progress !== undefined && (
+        {item.progress !== undefined && item.total !== undefined && (
           <View style={styles.progressBar}>
             <View
               style={[
@@ -88,21 +109,18 @@ const AchievementItem = ({ item, recent }) => {
   );
 };
 
-const AchievementsScreen = () => {
-  const dispatch = useDispatch();
-  const { achievements, recentUnlocks } = useSelector(
-    (state) => state.achievements
-  );
+const AchievementsScreen: React.FC<AchievementsScreenProps> = () => {
+  const { achievements, recentUnlocks, clearRecentUnlocks } = useStore();
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      dispatch(clearRecentUnlocks());
+      clearRecentUnlocks();
     }, 3000);
 
     return () => clearTimeout(timer);
   }, [recentUnlocks]);
 
-  const renderItem = ({ item }) => (
+  const renderItem: ListRenderItem<Achievement> = ({ item }) => (
     <AchievementItem
       item={item}
       recent={recentUnlocks.some((unlock) => unlock.id === item.id)}

@@ -7,20 +7,23 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { useSelector, useDispatch } from 'react-redux';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import { startNewGame, loadGame } from '../store/gameSlice';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
+import useStore from '../store/useStore';
+
+type HomeScreenProps = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
+};
 
 const { width } = Dimensions.get('window');
 
-const HomeScreen = ({ navigation }) => {
-  const dispatch = useDispatch();
-  const { username } = useSelector((state) => state.settings);
-  const { gameHistory, isGameActive } = useSelector((state) => state.game);
-  const buttonScale = new Animated.Value(1);
+const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const { settings, game } = useStore();
+  const buttonScale = React.useRef(new Animated.Value(1)).current;
 
-  const animateButton = (scale) => {
+  const animateButton = (scale: number) => {
     Animated.spring(buttonScale, {
       toValue: scale,
       friction: 3,
@@ -33,7 +36,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleResumeGame = () => {
-    if (isGameActive) {
+    if (game.isGameActive) {
       navigation.navigate('Game');
     }
   };
@@ -47,7 +50,7 @@ const HomeScreen = ({ navigation }) => {
 
     return (
       <Text style={styles.welcomeText}>
-        {greeting}, {username || 'Player'}!
+        {greeting}, {settings.username || 'Player'}!
       </Text>
     );
   };
@@ -72,7 +75,7 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.buttonText}>New Game</Text>
           </TouchableOpacity>
 
-          {isGameActive && (
+          {game.isGameActive && (
             <TouchableOpacity
               style={[styles.button, styles.resumeButton]}
               onPress={handleResumeGame}
@@ -81,7 +84,7 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           )}
 
-          {gameHistory.length > 0 && (
+          {game.gameHistory.length > 0 && (
             <TouchableOpacity
               style={[styles.button, styles.historyButton]}
               onPress={() => navigation.navigate('GameHistory')}
