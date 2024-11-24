@@ -1,21 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-  Alert,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Dimensions } from 'react-native';
 import useStore from '../store/useStore';
 import { validateMove, checkCompletion } from '../utils/sudokuGenerator';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { boardThemes } from '../themes/boardThemes';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
-import { useSharedValue, withSpring, useAnimatedStyle, interpolate } from 'react-native-reanimated';
 
 type GameScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Game'>;
@@ -34,11 +34,10 @@ const GameScreen= ({ navigation }: GameScreenProps) => {
   const {
     game,
     settings,
-    updateCell,
-    addMistake,
+    makeMove,
     toggleNote,
-    saveGame,
-    updateTimer,
+    pauseGame,
+    resumeGame,
     unlockAchievement,
   } = useStore();
 
@@ -84,68 +83,87 @@ const GameScreen= ({ navigation }: GameScreenProps) => {
 
     // Start timer
     const timer = setInterval(() => {
-      updateTimer();
+      resumeGame();
     }, 1000);
 
     return () => clearInterval(timer);
   }, []);
 
+  // Handle cell selection
   const handleCellPress = (row: number, col: number) => {
-    if (game.currentGame.initial[row][col] === 0) {
+    if (settings.hapticEnabled) {
+      Haptics.selectionAsync();
+    }
+
+    if (game.initialBoard[row][col] === 0) {
       setSelectedCell({ row, col });
       animateCell(row, col);
     }
   };
 
+  // Handle number input
   const handleNumberInput = (number: number) => {
     if (!selectedCell) return;
     const { row, col } = selectedCell;
+
+    if (settings.hapticEnabled) {
+      Haptics.selectionAsync();
+    }
+
+    if (game.initialBoard[row][col] !== 0) {
+      return;
+    }
 
     if (isNotesMode) {
       toggleNote(row, col, number);
       return;
     }
 
-    if (validateMove(game.currentGame.current, row, col, number)) {
-      updateCell(row, col, number);
+    if (validateMove(game.board, row, col, number)) {
+      makeMove(row, col, number);
       
       // Check if the move completes the game
-      if (checkCompletion(game.currentGame.current)) {
+      if (checkCompletion(game.board)) {
         handleGameCompletion();
       }
     } else {
-      addMistake();
-      if (game.mistakes >= 3) {
-        Alert.alert(
-          'Game Over',
-          'You have made too many mistakes. Try again!',
-          [
-            {
-              text: 'New Game',
-              onPress: () => navigation.navigate('DifficultySelect'),
-            },
-            {
-              text: 'Main Menu',
-              onPress: () => navigation.navigate('Home'),
-            },
-          ]
-        );
+      // Invalid move
+      if (settings.hapticEnabled) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+      pauseGame();
+      Alert.alert(
+        'Invalid Move',
+        'Please try again.',
+        [
+          {
+            text: 'OK',
+            onPress: () => resumeGame(),
+          },
+        ]
+      );
     }
   };
 
   const handleGameCompletion = () => {
-    saveGame();
-    
     // Check for achievements
-    if (game.difficulty === 10) {
-      unlockAchievement('master');
+    if (game.difficulty === 3) { // Expert difficulty
+      unlockAchievement({
+        id: 'master',
+        title: 'Sudoku Master',
+        description: 'Complete an Expert level puzzle',
+        icon: '🏆',
+        unlocked: true
+      });
     }
     if (game.mistakes === 0) {
-      unlockAchievement('perfectionist');
-    }
-    if (game.timer <= 300) { // 5 minutes
-      unlockAchievement('speedster');
+      unlockAchievement({
+        id: 'perfect',
+        title: 'Perfect Game',
+        description: 'Complete a puzzle with no mistakes',
+        icon: '✨',
+        unlocked: true
+      });
     }
 
     Alert.alert(
@@ -165,8 +183,8 @@ const GameScreen= ({ navigation }: GameScreenProps) => {
   };
 
   const renderCell = (row: number, col: number) => {
-    const value = game.currentGame.current[row][col];
-    const isInitial = game.currentGame.initial[row][col] !== 0;
+    const value = game.board[row][col];
+    const isInitial = game.initialBoard[row][col] !== 0;
     const isSelected = selectedCell?.row === row && selectedCell?.col === col;
     const notes = game.notes[`${row}-${col}`] || [];
     const theme = boardThemes[settings.boardTheme || 'classic'];

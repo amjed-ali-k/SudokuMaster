@@ -8,6 +8,7 @@ export type GameHistory = {
   boardTheme: string;
   initialBoard: number[][];
   finalBoard: number[][];
+  achievementsEarned?: Achievement[];
 };
 
 export type Statistics = {

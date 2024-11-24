@@ -157,21 +157,25 @@ const GameDetailsScreen = ({ route, navigation }: GameDetailsScreenProps) => {
           {renderGrid()}
         </View>
 
-        <View style={styles.achievementsContainer}>
-          <Text style={styles.achievementsTitle}>Achievements Earned</Text>
-          {gameHistory.achievementsEarned?.map((achievement) => (
-            <View key={achievement.id} style={styles.achievementCard}>
-              <View style={styles.achievementIcon}>
-                <Ionicons name={achievement.icon} size={24} color="#FFD700" />
+        <View style={styles.achievementsSection}>
+          <Text style={styles.sectionTitle}>Achievements Earned</Text>
+          {gameHistory.achievementsEarned && gameHistory.achievementsEarned.length > 0 ? (
+            gameHistory.achievementsEarned.map((achievement) => (
+              <View key={achievement.id} style={styles.achievementItem}>
+                <Text style={styles.achievementIcon}>{achievement.icon}</Text>
+                <View style={styles.achievementInfo}>
+                  <Text style={styles.achievementTitle}>{achievement.title}</Text>
+                  <Text style={styles.achievementDescription}>
+                    {achievement.description}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.achievementInfo}>
-                <Text style={styles.achievementTitle}>{achievement.title}</Text>
-                <Text style={styles.achievementDescription}>
-                  {achievement.description}
-                </Text>
-              </View>
-            </View>
-          ))}
+            ))
+          ) : (
+            <Text style={styles.noAchievements}>
+              No achievements earned in this game
+            </Text>
+          )}
         </View>
       </ScrollView>
     </LinearGradient>
@@ -257,19 +261,19 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  achievementsContainer: {
+  achievementsSection: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 15,
     padding: 20,
     marginBottom: 20,
   },
-  achievementsTitle: {
+  sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 15,
   },
-  achievementCard: {
+  achievementItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
@@ -286,12 +290,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   achievementIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF8E7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    fontSize: 24,
+    color: '#FFD700',
     marginRight: 15,
   },
   achievementInfo: {
@@ -306,6 +306,12 @@ const styles = StyleSheet.create({
   achievementDescription: {
     fontSize: 14,
     color: '#666',
+  },
+  noAchievements: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 20,
   },
   errorText: {
     fontSize: 18,
